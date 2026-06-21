@@ -1,0 +1,39 @@
+{
+  "name": "fallow-code-scan",
+  "version": "0.1.0",
+  "description": "Local web dashboard for Fallow code analysis reports.",
+  "main": "src/server.js",
+  "bin": {
+    "code-scan": "src/start.js",
+    "fallow-code-scan": "src/start.js"
+  },
+  "files": [
+    "assets",
+    "public",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "node src/start.js",
+    "test": "node --test test/*.test.js",
+    "pack:dry": "npm pack --dry-run"
+  },
+  "keywords": [
+    "fallow",
+    "code-analysis",
+    "dashboard",
+    "maintainability",
+    "dead-code"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "fallow": "2.91.0",
+    "lucide": "1.21.0"
+  }
+}

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Code Scan</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <div class="title-line">
+            <i class="title-icon" data-lucide="code-2" aria-hidden="true"></i>
+            <h1>Code Scan</h1>
+            <div id="status-pill" class="status-pill status-idle" aria-live="polite">Idle</div>
+          </div>
+          <p id="run-summary" class="muted">No scan has run yet.</p>
+        </div>
+        <div class="toolbar">
+          <label class="auto-refresh">
+            <input id="auto-refresh" type="checkbox">
+            Auto refresh
+          </label>
+          <button id="copy-report" class="secondary-button icon-button" type="button" disabled>
+            <i data-lucide="copy" aria-hidden="true"></i>
+            <span class="button-label">Copy report</span>
+          </button>
+          <button id="refresh-button" class="icon-button" type="button">
+            <i data-lucide="refresh-cw" aria-hidden="true"></i>
+            <span class="button-label">Refresh</span>
+          </button>
+        </div>
+      </header>
+
+      <section id="error-banner" class="error-banner" aria-live="assertive" hidden></section>
+
+      <section id="overview-grid" class="overview-grid"></section>
+
+      <section class="analysis-grid">
+        <div class="main-column">
+          <section class="panel panel-critical">
+            <div class="panel-header">
+              <div class="section-title section-title-critical">
+                <i class="section-icon" data-lucide="circle-x" aria-hidden="true"></i>
+                <h2>Blocking Findings</h2>
+                <span id="blocking-count" class="panel-count">0</span>
+              </div>
+              <button id="copy-blocking" class="copy-section icon-button" type="button" disabled>
+                <i data-lucide="copy" aria-hidden="true"></i>
+                <span class="button-label">Copy</span>
+              </button>
+            </div>
+            <div id="check-sections" class="stack-list"></div>
+          </section>
+
+          <section class="panel panel-refactoring targets-panel">
+            <div class="panel-header">
+              <div class="section-title section-title-refactoring">
+                <i class="section-icon" data-lucide="scissors" aria-hidden="true"></i>
+                <h2>Refactoring Suggestions</h2>
+                <span id="target-count" class="panel-count">0</span>
+              </div>
+              <button id="copy-refactoring" class="copy-section icon-button" type="button" disabled>
+                <i data-lucide="copy" aria-hidden="true"></i>
+                <span class="button-label">Copy</span>
+              </button>
+            </div>
+            <div id="targets-list" class="target-grid"></div>
+          </section>
+        </div>
+
+        <aside class="panel health-panel">
+          <div class="panel-header">
+            <div class="section-title">
+              <i class="section-icon" data-lucide="bar-chart-3" aria-hidden="true"></i>
+              <h2>Code Health</h2>
+            </div>
+          </div>
+          <div id="health-summary" class="health-summary"></div>
+          <h3 class="section-subhead">
+            <i data-lucide="alert-triangle" aria-hidden="true"></i>
+            <span>Lowest Maintainability</span>
+          </h3>
+          <div id="file-scores" class="stack-list"></div>
+        </aside>
+      </section>
+    </main>
+
+    <script src="/vendor/lucide.js"></script>
+    <script src="/app-format.js"></script>
+    <script src="/app-copy.js"></script>
+    <script src="/app-icons.js"></script>
+    <script src="/app-findings.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
