@@ -1,6 +1,6 @@
 {
-  "name": "@yukkaxxl/code-scan",
-  "version": "0.1.0",
+  "name": "fallow-code-scan",
+  "version": "0.1.1",
   "description": "Local web dashboard for Fallow code analysis reports.",
   "main": "src/server.js",
   "bin": {
