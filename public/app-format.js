@@ -59,21 +59,36 @@
 
   function formatCouplingSummary(health) {
     const coupling = health.coupling || {};
-    const highPercent = numberOr(coupling.highPercent, health.vitalSigns.couplingHighPercent);
+    const summary = couplingSummary(health, coupling);
+    const details = couplingSummaryDetails(health, coupling);
+    return details.length > 0 ? `${summary} (${details.join("; ")})` : summary;
+  }
+
+  function couplingSummary(health, coupling) {
+    const highPercent = couplingHighPercent(health, coupling);
     const scoredFileCount = numberOr(coupling.scoredFileCount, health.summary.filesScored);
+    if (scoredFileCount > 0) return scoredCouplingSummary(coupling, scoredFileCount);
+    return highPercent > 0 ? `${highPercent}% of files are unusually reused` : "No unusually reused files";
+  }
+
+  function scoredCouplingSummary(coupling, scoredFileCount) {
     const thresholdText = couplingThresholdText(coupling);
     const displayCount = couplingDisplayCount(coupling, Boolean(thresholdText));
-    const details = [];
+    if (displayCount === 0) return `No unusually reused files among ${formatNumber(scoredFileCount)} files`;
+    return `${formatNumber(displayCount)} ${pluralize("file", displayCount)} unusually reused among ${formatNumber(scoredFileCount)} files`;
+  }
 
-    if (highPercent > 0) details.push(`${highPercent}%`);
-    if (thresholdText) details.push(`unusual means ${thresholdText}`);
-    if (scoredFileCount > 0) {
-      const summary = displayCount === 0
-        ? `No unusually reused files among ${formatNumber(scoredFileCount)} files`
-        : `${formatNumber(displayCount)} ${pluralize("file", displayCount)} unusually reused among ${formatNumber(scoredFileCount)} files`;
-      return details.length > 0 ? `${summary} (${details.join("; ")})` : summary;
-    }
-    return highPercent > 0 ? `${highPercent}% of files are unusually reused` : "No unusually reused files";
+  function couplingSummaryDetails(health, coupling) {
+    const highPercent = couplingHighPercent(health, coupling);
+    const thresholdText = couplingThresholdText(coupling);
+    return [
+      highPercent > 0 ? `${highPercent}%` : "",
+      thresholdText ? `unusual means ${thresholdText}` : ""
+    ].filter(Boolean);
+  }
+
+  function couplingHighPercent(health, coupling) {
+    return numberOr(coupling.highPercent, health.vitalSigns.couplingHighPercent);
   }
 
   function couplingDisplayCount(coupling, hasThreshold) {
@@ -85,14 +100,15 @@
 
   function couplingThresholdText(coupling) {
     if (!coupling) return "";
-    const thresholds = [];
-    if (coupling.fanInThreshold !== null && coupling.fanInThreshold !== undefined && Number.isFinite(Number(coupling.fanInThreshold))) {
-      thresholds.push(`more than ${formatNumber(coupling.fanInThreshold)} other files depend on it`);
-    }
-    if (coupling.fanOutThreshold !== null && coupling.fanOutThreshold !== undefined && Number.isFinite(Number(coupling.fanOutThreshold))) {
-      thresholds.push(`it depends on more than ${formatNumber(coupling.fanOutThreshold)} other files`);
-    }
-    return thresholds.join(" or ");
+    return [
+      couplingThreshold(coupling.fanInThreshold, (value) => `more than ${formatNumber(value)} other files depend on it`),
+      couplingThreshold(coupling.fanOutThreshold, (value) => `it depends on more than ${formatNumber(value)} other files`)
+    ].filter(Boolean).join(" or ");
+  }
+
+  function couplingThreshold(value, format) {
+    const number = Number(value);
+    return Number.isFinite(number) ? format(number) : "";
   }
 
   function pluralize(word, count) {

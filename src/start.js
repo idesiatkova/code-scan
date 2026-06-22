@@ -38,13 +38,21 @@ function stopProcess(pid) {
 }
 
 function readPreviousPid() {
+  return parsePid(readPidFileContent());
+}
+
+function readPidFileContent() {
   try {
-    const pid = Number(fs.readFileSync(PID_FILE_PATH, "utf8").trim());
-    return Number.isInteger(pid) && pid > 0 ? pid : null;
+    return fs.readFileSync(PID_FILE_PATH, "utf8").trim();
   } catch (error) {
-    if (error.code === "ENOENT") return null;
+    if (error.code === "ENOENT") return "";
     throw error;
   }
+}
+
+function parsePid(content) {
+  const pid = Number(content);
+  return Number.isInteger(pid) && pid > 0 ? pid : null;
 }
 
 function isProcessRunning(pid) {

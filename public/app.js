@@ -190,17 +190,25 @@
   }
 
   function scheduleRunningPoll(payload) {
+    clearRunningPoll();
+    if (payload.running) return scheduleReportPoll();
+    completeScan();
+  }
+
+  function clearRunningPoll() {
     if (runningPollId) window.clearTimeout(runningPollId);
     runningPollId = null;
+  }
 
-    if (payload.running) {
-      runningPollId = window.setTimeout(() => {
-        loadReport().catch(showError);
-      }, POLL_WHILE_RUNNING_MS);
-    } else {
-      setButtonBusy(false);
-      if (elements.autoRefresh.checked && !autoRefreshTimeoutId) scheduleNextAutoRefresh();
-    }
+  function scheduleReportPoll() {
+    runningPollId = window.setTimeout(() => {
+      loadReport().catch(showError);
+    }, POLL_WHILE_RUNNING_MS);
+  }
+
+  function completeScan() {
+    setButtonBusy(false);
+    if (elements.autoRefresh.checked && !autoRefreshTimeoutId) scheduleNextAutoRefresh();
   }
 
   function renderPayload(payload) {
@@ -326,16 +334,29 @@
 
   function metricDeltaHtml(item, previousValue) {
     const delta = metricDelta(item, previousValue);
-    if (delta === null || delta === 0) return "";
-    const icon = delta > 0 ? "arrow-up-right" : "arrow-down-right";
-    const label = delta > 0 ? "Increased" : "Decreased";
+    if (!hasMetricDelta(delta)) return "";
+    return metricDeltaMarkup(item, delta);
+  }
+
+  function hasMetricDelta(delta) {
+    return delta !== null && delta !== 0;
+  }
+
+  function metricDeltaMarkup(item, delta) {
+    const change = metricDeltaChange(delta);
     const value = formatDelta(delta, item.suffix);
     return `
-      <div class="metric-delta" aria-label="${escapeHtml(`${label} by ${value} since last scan`)}">
+      <div class="metric-delta" aria-label="${escapeHtml(`${change.label} by ${value} since last scan`)}">
         <span>${escapeHtml(value)}</span>
-        <i class="metric-delta-icon" data-lucide="${icon}" aria-hidden="true"></i>
+        <i class="metric-delta-icon" data-lucide="${change.icon}" aria-hidden="true"></i>
       </div>
     `;
+  }
+
+  function metricDeltaChange(delta) {
+    return delta > 0
+      ? { icon: "arrow-up-right", label: "Increased" }
+      : { icon: "arrow-down-right", label: "Decreased" };
   }
 
   function metricHistogramHtml(item, series) {
@@ -372,27 +393,42 @@
   }
 
   function metricHistogramCurvePath(points) {
-    if (points.length === 2) {
-      return `M ${metricHistogramCoordinate(points[0])} L ${metricHistogramCoordinate(points[1])}`;
-    }
+    if (points.length === 2) return straightMetricHistogramPath(points);
+    return smoothMetricHistogramPath(points);
+  }
 
+  function straightMetricHistogramPath(points) {
+    return `M ${metricHistogramCoordinate(points[0])} L ${metricHistogramCoordinate(points[1])}`;
+  }
+
+  function smoothMetricHistogramPath(points) {
     let path = `M ${metricHistogramCoordinate(points[0])}`;
     for (let index = 0; index < points.length - 1; index += 1) {
-      const before = points[index - 1] || points[index];
-      const start = points[index];
-      const end = points[index + 1];
-      const after = points[index + 2] || end;
-      const controlOne = {
-        x: start.x + (end.x - before.x) / 6,
-        y: start.y + (end.y - before.y) / 6
-      };
-      const controlTwo = {
-        x: end.x - (after.x - start.x) / 6,
-        y: end.y - (after.y - start.y) / 6
-      };
-      path += ` C ${metricHistogramCoordinate(controlOne)} ${metricHistogramCoordinate(controlTwo)} ${metricHistogramCoordinate(end)}`;
+      path += metricHistogramCurveSegment(points, index);
     }
     return path;
+  }
+
+  function metricHistogramCurveSegment(points, index) {
+    const start = points[index];
+    const end = points[index + 1];
+    const controls = metricHistogramCurveControls(points, index, start, end);
+    return ` C ${metricHistogramCoordinate(controls.first)} ${metricHistogramCoordinate(controls.second)} ${metricHistogramCoordinate(end)}`;
+  }
+
+  function metricHistogramCurveControls(points, index, start, end) {
+    const before = points[Math.max(index - 1, 0)];
+    const after = points[Math.min(index + 2, points.length - 1)];
+    return {
+      first: {
+        x: start.x + (end.x - before.x) / 6,
+        y: start.y + (end.y - before.y) / 6
+      },
+      second: {
+        x: end.x - (after.x - start.x) / 6,
+        y: end.y - (after.y - start.y) / 6
+      }
+    };
   }
 
   function metricHistogramCoordinate(point) {
@@ -442,27 +478,44 @@
   }
 
   function previousMetricsForSnapshot(history, snapshot, sampleId) {
-    if (history.current && sameMetricSnapshot(history.current, snapshot)) {
-      return isNewMetricSample(history, sampleId) ? history.current : history.previous || {};
-    }
-    return history.current || {};
+    if (!history.current || !sameMetricSnapshot(history.current, snapshot)) return history.current || {};
+    return previousMetricsForMatchingSnapshot(history, sampleId);
+  }
+
+  function previousMetricsForMatchingSnapshot(history, sampleId) {
+    return isNewMetricSample(history, sampleId) ? history.current : history.previous || {};
   }
 
   function metricSeriesForSnapshot(history, snapshot, sampleId) {
     const isNewSample = isNewMetricSample(history, sampleId);
-    return Object.fromEntries(Object.entries(snapshot).map(([id, value]) => {
-      const demoSeries = shouldShowCouplingDemo() ? DEMO_METRIC_SERIES[id] : null;
-      if (demoSeries) return [id, [...demoSeries]];
+    return Object.fromEntries(Object.entries(snapshot).map(([id, value]) => [
+      id,
+      metricSeriesForValue(history, id, value, isNewSample)
+    ]));
+  }
 
-      const stored = Array.isArray(history.series && history.series[id])
-        ? [...history.series[id]]
-        : legacyMetricSeries(history, id);
-      const currentValue = metricNumber(value);
-      if (currentValue !== null && (stored.length === 0 || stored[stored.length - 1] !== currentValue || isNewSample)) {
-        stored.push(currentValue);
-      }
-      return [id, stored.slice(-METRIC_HISTORY_LIMIT)];
-    }));
+  function metricSeriesForValue(history, id, value, isNewSample) {
+    const demoSeries = shouldShowCouplingDemo() ? DEMO_METRIC_SERIES[id] : null;
+    if (demoSeries) return [...demoSeries];
+    const stored = storedMetricSeries(history, id);
+    return addMetricSample(stored, value, isNewSample);
+  }
+
+  function storedMetricSeries(history, id) {
+    const stored = history.series && history.series[id];
+    return Array.isArray(stored) ? [...stored] : legacyMetricSeries(history, id);
+  }
+
+  function addMetricSample(stored, value, isNewSample) {
+    const currentValue = metricNumber(value);
+    if (shouldAddMetricSample(stored, currentValue, isNewSample)) stored.push(currentValue);
+    return stored.slice(-METRIC_HISTORY_LIMIT);
+  }
+
+  function shouldAddMetricSample(stored, currentValue, isNewSample) {
+    if (currentValue === null) return false;
+    if (stored.length === 0) return true;
+    return stored[stored.length - 1] !== currentValue || isNewSample;
   }
 
   function isNewMetricSample(history, sampleId) {
@@ -472,7 +525,12 @@
   function legacyMetricSeries(history, id) {
     const values = [metricNumber(history.previous && history.previous[id]), metricNumber(history.current && history.current[id])]
       .filter((value) => value !== null);
-    return values.length === 2 && values[0] === values[1] ? [values[1]] : values;
+    return collapseFlatMetricSeries(values);
+  }
+
+  function collapseFlatMetricSeries(values) {
+    if (values.length !== 2 || values[0] !== values[1]) return values;
+    return [values[1]];
   }
 
   function readMetricHistory() {
@@ -489,16 +547,35 @@
   }
 
   function normalizeMetricHistory(parsed) {
-    if (!parsed || typeof parsed !== "object") return {};
-    if ("current" in parsed || "previous" in parsed) {
-      return {
-        current: normalizeMetricSnapshot(parsed.current),
-        previous: normalizeMetricSnapshot(parsed.previous),
-        series: normalizeMetricSeries(parsed.series),
-        sampleId: typeof parsed.sampleId === "string" ? parsed.sampleId : null
-      };
-    }
-    return { current: normalizeMetricSnapshot(parsed), series: {}, sampleId: null };
+    if (!isMetricHistoryObject(parsed)) return {};
+    return hasMetricSnapshots(parsed)
+      ? normalizedMetricHistory(parsed)
+      : legacyMetricHistory(parsed);
+  }
+
+  function isMetricHistoryObject(value) {
+    return Boolean(value) && typeof value === "object";
+  }
+
+  function hasMetricSnapshots(history) {
+    return "current" in history || "previous" in history;
+  }
+
+  function normalizedMetricHistory(history) {
+    return {
+      current: normalizeMetricSnapshot(history.current),
+      previous: normalizeMetricSnapshot(history.previous),
+      series: normalizeMetricSeries(history.series),
+      sampleId: metricSampleId(history)
+    };
+  }
+
+  function legacyMetricHistory(history) {
+    return { current: normalizeMetricSnapshot(history), series: {}, sampleId: null };
+  }
+
+  function metricSampleId(history) {
+    return typeof history.sampleId === "string" ? history.sampleId : null;
   }
 
   function normalizeMetricSnapshot(snapshot) {
@@ -516,21 +593,28 @@
   }
 
   function writeMetricHistory(snapshot, history, series, sampleId) {
-    const previous = history.current && (isNewMetricSample(history, sampleId) || !sameMetricSnapshot(history.current, snapshot))
-      ? history.current
-      : history.previous;
-    const nextHistory = {
-      current: snapshot,
-      previous: previous || null,
-      series: normalizeMetricSeries(series),
-      sampleId: typeof sampleId === "string" ? sampleId : null
-    };
+    const nextHistory = nextMetricHistory(snapshot, history, series, sampleId);
     document.cookie = [
       `${PREVIOUS_METRICS_COOKIE}=${encodeURIComponent(JSON.stringify(nextHistory))}`,
       `max-age=${PREVIOUS_METRICS_MAX_AGE_SECONDS}`,
       "path=/",
       "samesite=strict"
     ].join("; ");
+  }
+
+  function nextMetricHistory(snapshot, history, series, sampleId) {
+    return {
+      current: snapshot,
+      previous: previousMetricSnapshot(snapshot, history, sampleId) || null,
+      series: normalizeMetricSeries(series),
+      sampleId: metricSampleId({ sampleId })
+    };
+  }
+
+  function previousMetricSnapshot(snapshot, history, sampleId) {
+    if (!history.current) return history.previous;
+    if (isNewMetricSample(history, sampleId)) return history.current;
+    return sameMetricSnapshot(history.current, snapshot) ? history.previous : history.current;
   }
 
   function sameMetricSnapshot(left, right) {
@@ -677,17 +761,25 @@
   }
 
   function renderCouplingFiles(coupling) {
-    const candidates = Array.isArray(coupling && coupling.candidates) ? coupling.candidates : [];
+    const candidates = couplingCandidates(coupling);
     elements.couplingCount.textContent = format.formatNumber(candidates.length);
-    if (latestReport) {
-      elements.copyCoupling.dataset.copyText = format.formatUnusuallyReusedFilesText(latestReport);
-    }
+    renderCouplingCopyText();
     if (candidates.length === 0) {
       elements.couplingFiles.replaceChildren(emptyState("No unusually reused files."));
       return;
     }
 
     elements.couplingFiles.replaceChildren(...candidates.map((candidate) => renderCouplingFile(candidate, coupling)));
+  }
+
+  function couplingCandidates(coupling) {
+    if (!coupling) return [];
+    return Array.isArray(coupling.candidates) ? coupling.candidates : [];
+  }
+
+  function renderCouplingCopyText() {
+    if (!latestReport) return;
+    elements.copyCoupling.dataset.copyText = format.formatUnusuallyReusedFilesText(latestReport);
   }
 
   function renderCouplingFile(candidate, coupling) {
