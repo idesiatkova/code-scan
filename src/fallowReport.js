@@ -100,7 +100,7 @@ function buildOverview(parts, counts, health) {
       parts.targets.length,
       zeroTone(parts.targets.length, "neutral")
     ),
-    metric("unusually-reused-files", "Unusually Reused Files", health.coupling.candidateCount, "neutral"),
+    metric("unusually-reused-files", "Coupling", health.coupling.candidateCount, "neutral"),
     metric("maintainability", "Maintainability", summary.averageMaintainability, maintainabilityTone(summary), "%")
   ];
 }

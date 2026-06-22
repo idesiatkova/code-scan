@@ -68,14 +68,14 @@
     const highPercent = couplingHighPercent(health, coupling);
     const scoredFileCount = numberOr(coupling.scoredFileCount, health.summary.filesScored);
     if (scoredFileCount > 0) return scoredCouplingSummary(coupling, scoredFileCount);
-    return highPercent > 0 ? `${highPercent}% of files are unusually reused` : "No unusually reused files";
+    return highPercent > 0 ? `${highPercent}% of files have high coupling` : "No high-coupling files";
   }
 
   function scoredCouplingSummary(coupling, scoredFileCount) {
     const thresholdText = couplingThresholdText(coupling);
     const displayCount = couplingDisplayCount(coupling, Boolean(thresholdText));
-    if (displayCount === 0) return `No unusually reused files among ${formatNumber(scoredFileCount)} files`;
-    return `${formatNumber(displayCount)} ${pluralize("file", displayCount)} unusually reused among ${formatNumber(scoredFileCount)} files`;
+    if (displayCount === 0) return `No high-coupling files among ${formatNumber(scoredFileCount)} files`;
+    return `${formatNumber(displayCount)} ${pluralize("file", displayCount)} with high coupling among ${formatNumber(scoredFileCount)} files`;
   }
 
   function couplingSummaryDetails(health, coupling) {
@@ -83,7 +83,7 @@
     const thresholdText = couplingThresholdText(coupling);
     return [
       highPercent > 0 ? `${highPercent}%` : "",
-      thresholdText ? `unusual means ${thresholdText}` : ""
+      thresholdText ? `high coupling means ${thresholdText}` : ""
     ].filter(Boolean);
   }
 
@@ -126,10 +126,10 @@
     return `${lines.join("\n")}\n`;
   }
 
-  function formatUnusuallyReusedFilesText(report) {
+  function formatCouplingText(report) {
     const coupling = report.health.coupling || {};
     const candidates = Array.isArray(coupling.candidates) ? coupling.candidates : [];
-    const lines = ["Unusually reused files"];
+    const lines = ["Coupling"];
 
     if (candidates.length === 0) {
       lines.push("- None");
@@ -206,7 +206,7 @@
     formatRefactoringSuggestionsText,
     formatRiskSignalsText,
     formatReportText,
-    formatUnusuallyReusedFilesText,
+    formatCouplingText,
     thresholdTone
   };
 }

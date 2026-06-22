@@ -96,7 +96,7 @@ test("normalizes combined Fallow report into compact dashboard state", () => {
   assert.equal(report.overview[0].value, report.hardFindings.count);
   assert.equal(report.overview[1].label, "Refactoring Suggestions");
   assert.equal(report.overview[1].value, report.health.targets.length);
-  assert.equal(report.overview[2].label, "Unusually Reused Files");
+  assert.equal(report.overview[2].label, "Coupling");
   assert.equal(report.overview[2].value, report.health.coupling.candidateCount);
   assert.equal(report.overview[3].label, "Maintainability");
   assert.equal(report.overview[3].tone, "good");
