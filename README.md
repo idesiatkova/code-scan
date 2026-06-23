@@ -1,5 +1,9 @@
 # Code Scan
 
+> [!IMPORTANT]
+> Code Scan is deprecated. Future development continues in
+> [Code Shame](https://github.com/idesiatkova/code-shame).
+
 Local web dashboard for Fallow code analysis reports.
 
 ![Code Scan dashboard](./assets/code-scan-dashboard.jpg)
